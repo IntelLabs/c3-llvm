@@ -1,3 +1,14 @@
+# Notice:
+
+The contents of this repository and linked repositories are solely for research
+purposes and may contain software with vulnerabilities, such as outdated
+libraries. Do not use in production.
+
+This library is solely intended for use in the context of the system contained
+in https://github.com/IntelLabs/cc-simics.
+
+# Original README:
+
 # The LLVM Compiler Infrastructure
 
 This directory and its sub-directories contain source code for LLVM,
