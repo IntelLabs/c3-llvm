@@ -7,6 +7,13 @@ libraries. Do not use in production.
 This library is solely intended for use in the context of the system contained
 in https://github.com/IntelLabs/c3-simulator.
 
+This material is based upon work supported by the Naval Information Warfare
+Center Pacific and the Defense Advanced Research Project Agency under Prototype
+Other Transaction Agreement No. N66001-22-9-4017. Any opinions, findings and
+conclusions or recommendations expressed in this material are those of the
+author(s) and do not necessarily reflect the views of the Space and Naval
+Warfare Systems Center Pacific or the Defense Advanced Research Project Agency.
+
 # Original README:
 
 # The LLVM Compiler Infrastructure
