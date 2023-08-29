@@ -108,3 +108,5 @@ set_target_properties(lldbCore PROPERTIES LINK_INTERFACE_MULTIPLICITY 5)
 if (LLDB_ENABLE_CURSES)
   target_include_directories(lldbCore PRIVATE ${CURSES_INCLUDE_DIRS})
 endif()
+
+include_directories(${LLVM_MAIN_INCLUDE_DIR}/../../c3/include)

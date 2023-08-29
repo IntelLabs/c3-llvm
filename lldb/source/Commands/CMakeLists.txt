@@ -7,6 +7,7 @@ add_lldb_library(lldbCommands
   CommandObjectApropos.cpp
   CommandObjectBreakpoint.cpp
   CommandObjectBreakpointCommand.cpp
+  CommandObjectC3.cpp
   CommandObjectCommands.cpp
   CommandObjectDiagnostics.cpp
   CommandObjectDisassemble.cpp
@@ -59,3 +60,5 @@ add_lldb_library(lldbCommands
   )
 
 add_dependencies(lldbCommands LLDBOptionsGen)
+
+include_directories(${LLVM_MAIN_INCLUDE_DIR}/../../c3/include)

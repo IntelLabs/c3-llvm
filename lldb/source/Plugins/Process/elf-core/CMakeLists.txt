@@ -20,3 +20,5 @@ add_lldb_library(lldbPluginProcessElfCore PLUGIN
     BinaryFormat
     Support
   )
+
+include_directories(${LLVM_MAIN_INCLUDE_DIR}/../../c3/include)

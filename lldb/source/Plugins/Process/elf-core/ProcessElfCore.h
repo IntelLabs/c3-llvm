@@ -19,6 +19,8 @@
 #include <list>
 #include <vector>
 
+#include "c3/c3_llvm.h"
+
 #include "lldb/Target/PostMortemProcess.h"
 #include "lldb/Utility/ConstString.h"
 #include "lldb/Utility/Status.h"
@@ -73,6 +75,18 @@ public:
         "error: {0} does not support resuming processes", GetPluginName());
     return error;
   }
+
+#ifdef C3_DEBUGGING_SUPPORT
+  void c3_init() override;
+  void c3_dump_keys() override;
+  const uint8_t *c3_get_data_key() const override;
+  const uint8_t *c3_get_ptr_key() const override;
+  void c3_set_data_key(const uint8_t *key) override;
+  void c3_set_ptr_key(const uint8_t *key) override;
+  uint64_t c3_decode_ptr(uint64_t ptr) override;
+  void c3_cleanup();
+  void c3_ReadNote(const lldb_private::DataExtractor *data);
+#endif // C3_DEBUGGING_SUPPORT
 
   // Process Queries
   bool IsAlive() override;
@@ -151,6 +165,14 @@ private:
 
   // NT_FILE entries found from the NOTE segment
   std::vector<NT_FILE_Entry> m_nt_file_entries;
+
+#ifdef C3_DEBUGGING_SUPPORT
+  uint8_t c3_ptr_key[c3_ptr_key_size];
+  uint8_t c3_data_key[c3_data_key_size];
+
+  CCPointerEncoding *c3_ptrenc;
+  CCDataEncryption *c3_dataenc;
+#endif // C3_DEBUGGING_SUPPORT
 
   // Parse thread(s) data structures(prstatus, prpsinfo) from given NOTE segment
   llvm::Error ParseThreadContextsFromNoteSegment(

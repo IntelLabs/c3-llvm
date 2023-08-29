@@ -365,6 +365,17 @@ public:
     eBroadcastInternalStateControlResume = (1 << 2)
   };
 
+#define C3_DEBUGGING_SUPPORT
+#ifdef C3_DEBUGGING_SUPPORT
+  virtual void c3_init();
+  virtual void c3_dump_keys();
+  virtual const uint8_t *c3_get_data_key() const;
+  virtual const uint8_t *c3_get_ptr_key() const;
+  virtual void c3_set_data_key(const uint8_t *key);
+  virtual void c3_set_ptr_key(const uint8_t *key);
+  virtual uint64_t c3_decode_ptr(uint64_t ptr);
+#endif // C3_DEBUGGING_SUPPORT
+
   typedef Range<lldb::addr_t, lldb::addr_t> LoadRange;
   // We use a read/write lock to allow on or more clients to access the process
   // state while the process is stopped (reader). We lock the write lock to

@@ -15,6 +15,7 @@
 
 #include "Commands/CommandObjectApropos.h"
 #include "Commands/CommandObjectBreakpoint.h"
+#include "Commands/CommandObjectC3.h"
 #include "Commands/CommandObjectCommands.h"
 #include "Commands/CommandObjectDWIMPrint.h"
 #include "Commands/CommandObjectDiagnostics.h"
@@ -532,6 +533,10 @@ void CommandInterpreter::LoadCommandDictionary() {
   REGISTER_COMMAND_OBJECT("apropos", CommandObjectApropos);
   REGISTER_COMMAND_OBJECT("breakpoint", CommandObjectMultiwordBreakpoint);
   REGISTER_COMMAND_OBJECT("command", CommandObjectMultiwordCommands);
+#define C3_DEBUGGING_SUPPORT
+#ifdef C3_DEBUGGING_SUPPORT
+  REGISTER_COMMAND_OBJECT("c3", CommandObjectC3);
+#endif  // C3_DEBUGGING_SUPPORT
   REGISTER_COMMAND_OBJECT("diagnostics", CommandObjectDiagnostics);
   REGISTER_COMMAND_OBJECT("disassemble", CommandObjectDisassemble);
   REGISTER_COMMAND_OBJECT("dwim-print", CommandObjectDWIMPrint);

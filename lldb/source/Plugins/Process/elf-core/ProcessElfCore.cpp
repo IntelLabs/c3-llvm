@@ -11,6 +11,8 @@
 #include <memory>
 #include <mutex>
 
+#include "c3/c3_llvm.h"
+
 #include "lldb/Core/Module.h"
 #include "lldb/Core/ModuleSpec.h"
 #include "lldb/Core/PluginManager.h"
@@ -47,6 +49,92 @@ void ProcessElfCore::Terminate() {
   PluginManager::UnregisterPlugin(ProcessElfCore::CreateInstance);
 }
 
+#ifdef C3_DEBUGGING_SUPPORT
+
+#include "crypto/ascon_cipher.cpp"
+#undef BITMASK
+#include "crypto/bipbip.cpp"
+#undef BITMASK
+
+void ProcessElfCore::c3_init() {
+  static constexpr size_t c3_ptr_key_size = KEY_SIZE(CC_POINTER_CIPHER);
+  static constexpr size_t c3_data_key_size = KEY_SIZE(CC_DATA_CIPHER);
+  static constexpr uint8_t def_ptr_key[c3_ptr_key_size] = {
+      0xd1, 0xbe, 0x2c, 0xdb, 0xb5, 0x82, 0x4d, 0x03, 0x17, 0x5c, 0x25,
+      0x2a, 0x20, 0xb6, 0xf2, 0x93, 0xfd, 0x01, 0x96, 0xe7, 0xb5, 0xe6,
+      0x88, 0x1c, 0xb3, 0x69, 0x22, 0x60, 0x38, 0x09, 0xf6, 0x68};
+  static constexpr uint8_t def_data_key[c3_data_key_size] = {
+      0xb5, 0x82, 0x4d, 0x03, 0x17, 0x5c, 0x25, 0x2a,
+      0xfc, 0x71, 0x1e, 0x01, 0x02, 0x60, 0x87, 0x91};
+
+  memcpy(c3_ptr_key, def_ptr_key, c3_ptr_key_size);
+  memcpy(c3_data_key, def_data_key, c3_data_key_size);
+
+  dbgprint("Setting data key to %s",
+           buf_to_hex_string(c3_data_key, c3_data_key_size).c_str());
+  dbgprint("Setting ptr key to %s",
+           buf_to_hex_string(c3_ptr_key, c3_ptr_key_size).c_str());
+  c3_dump_keys();
+
+  // TODO(hliljest): Fix memory leak caused by raw pointers!
+  c3_ptrenc = new CCPointerEncoding();
+  c3_ptrenc->init_pointer_key(c3_ptr_key, c3_ptr_key_size);
+
+  c3_dataenc = new CCDataEncryption();
+  c3_dataenc->set_key(c3_data_key);
+}
+
+void ProcessElfCore::c3_cleanup() {
+  if (c3_ptrenc != nullptr)
+    delete c3_ptrenc;
+  if (c3_dataenc != nullptr)
+    delete c3_dataenc;
+}
+
+void ProcessElfCore::c3_ReadNote(const lldb_private::DataExtractor *data) {
+  dbgprint("Found NT_C3_CTX note in coredump, extracting C3 keys");
+  assert(sizeof(struct cc_context) == data->GetByteSize());
+  auto ctx = reinterpret_cast<const struct cc_context *>(data->GetDataStart());
+  assert(ctx != nullptr);
+
+  // Extract the keys form the C3 context Note
+  c3_set_ptr_key(ctx->addr_key_bytes_);
+  c3_set_data_key(ctx->dp_key_bytes_);
+  c3_dump_keys();
+}
+
+void ProcessElfCore::c3_dump_keys() {
+  dbgprint("Trying to dump stuff now");
+  dbgprint("%-10s: %s", "data key",
+           buf_to_hex_string(c3_data_key, c3_data_key_size).c_str());
+  dbgprint("%-10s: %s", "ptr key",
+           buf_to_hex_string(c3_ptr_key, c3_ptr_key_size).c_str());
+}
+
+const uint8_t *ProcessElfCore::c3_get_data_key() const {
+  return (const uint8_t *)&c3_data_key;
+}
+
+const uint8_t *ProcessElfCore::c3_get_ptr_key() const {
+  return (const uint8_t *)&c3_ptr_key;
+}
+
+void ProcessElfCore::c3_set_data_key(const uint8_t *key) {
+  memcpy(c3_data_key, key, c3_data_key_size);
+  c3_dataenc->set_key(c3_data_key);
+}
+
+void ProcessElfCore::c3_set_ptr_key(const uint8_t *key) {
+  memcpy(c3_ptr_key, key, c3_ptr_key_size);
+  c3_ptrenc->init_pointer_key(c3_ptr_key, c3_ptr_key_size);
+}
+
+uint64_t ProcessElfCore::c3_decode_ptr(uint64_t ptr) {
+  return c3_ptrenc->decode_pointer(ptr);
+}
+
+#endif // C3_DEBUGGING_SUPPORT
+
 lldb::ProcessSP ProcessElfCore::CreateInstance(lldb::TargetSP target_sp,
                                                lldb::ListenerSP listener_sp,
                                                const FileSpec *crash_file,
@@ -76,6 +164,11 @@ lldb::ProcessSP ProcessElfCore::CreateInstance(lldb::TargetSP target_sp,
       }
     }
   }
+
+#ifdef C3_DEBUGGING_SUPPORT
+  reinterpret_cast<ProcessElfCore *>(process_sp.get())->c3_init();
+#endif // C3_DEBUGGING_SUPPORT
+
   return process_sp;
 }
 
@@ -366,6 +459,17 @@ size_t ProcessElfCore::DoReadMemory(lldb::addr_t addr, void *buf, size_t size,
                                     Status &error) {
   ObjectFile *core_objfile = m_core_module_sp->GetObjectFile();
 
+#ifdef C3_DEBUGGING_SUPPORT
+  const bool is_encoded_addr = is_encoded_cc_ptr(addr);
+  const uint64_t encoded_addr = is_encoded_addr ? (uint64_t) addr : 0;
+  if (is_encoded_addr) {
+    dbgprint("Looks like we have a CA: 0x%016lx", (uint64_t)addr);
+    addr = c3_ptrenc->decode_pointer(addr);
+    dbgprint("Looks like we have a CA: 0x%016lx", (uint64_t)addr);
+    dbgprint("              decoded -> 0x%016lx", (uint64_t)addr);
+  }
+#endif // C3_DEBUGGING_SUPPORT
+
   if (core_objfile == nullptr)
     return 0;
 
@@ -404,6 +508,21 @@ size_t ProcessElfCore::DoReadMemory(lldb::addr_t addr, void *buf, size_t size,
   if (bytes_to_read)
     bytes_copied =
         core_objfile->CopyData(offset + file_start, bytes_to_read, buf);
+
+#ifdef C3_DEBUGGING_SUPPORT
+  if (is_encoded_addr) {
+    const auto mask = get_tweak_mask(encoded_addr);
+    const auto masked_addr = mask ^ addr;
+    const auto max_size = (1UL + ~mask) - masked_addr;
+    const auto bytes_in_ps = std::min(bytes_copied, max_size);
+
+    auto *tmp_buf = (uint8_t *) malloc(bytes_copied);
+    memcpy(tmp_buf, buf, bytes_copied);
+    c3_dataenc->encrypt_decrypt_bytes(encoded_addr, tmp_buf, (uint8_t *)buf, bytes_in_ps);
+    free(tmp_buf);
+    dbgprint("Decrypted %lu bytes at %p (tweak: 0x%016lx)", bytes_in_ps, (void *)addr, encoded_addr);
+  }
+#endif // C3_DEBUGGING_SUPPORT
 
   return bytes_copied;
 }
@@ -444,6 +563,10 @@ void ProcessElfCore::Clear() {
   m_thread_list.Clear();
 
   SetUnixSignals(std::make_shared<UnixSignals>());
+
+#ifdef C3_DEBUGGING_SUPPORT
+  c3_cleanup();
+#endif  // C3_DEBUGGING_SUPPORT
 }
 
 void ProcessElfCore::Initialize() {
@@ -877,7 +1000,7 @@ llvm::Error ProcessElfCore::parseLinuxNotes(llvm::ArrayRef<CoreNote> notes) {
   bool have_prpsinfo = false;
   ThreadData thread_data;
   for (const auto &note : notes) {
-    if (note.info.n_name != "CORE" && note.info.n_name != "LINUX")
+    if (note.info.n_name != "CORE" && note.info.n_name != "LINUX" && note.info.n_name != "C3")
       continue;
 
     if ((note.info.n_type == ELF::NT_PRSTATUS && have_prstatus) ||
@@ -944,6 +1067,11 @@ llvm::Error ProcessElfCore::parseLinuxNotes(llvm::ArrayRef<CoreNote> notes) {
     case ELF::NT_AUXV:
       m_auxv = note.data;
       break;
+#ifdef C3_DEBUGGING_SUPPORT
+    case ELF::NT_C3_CTX:
+      c3_ReadNote(&note.data);
+      break;
+#endif  // C3_DEBUGGING_SUPPORT
     default:
       thread_data.notes.push_back(note);
       break;
