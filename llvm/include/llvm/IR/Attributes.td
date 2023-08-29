@@ -306,6 +306,10 @@ def MustProgress : EnumAttr<"mustprogress", [FnAttr]>;
 /// Function is a presplit coroutine.
 def PresplitCoroutine : EnumAttr<"presplitcoroutine", [FnAttr]>;
 
+/// CC Tripwires Function Attribute
+def CCTripwires : EnumAttr<"cctripwires", [FnAttr]>;
+
+
 /// Target-independent string attributes.
 def LessPreciseFPMAD : StrBoolAttr<"less-precise-fpmad">;
 def NoInfsFPMath : StrBoolAttr<"no-infs-fp-math">;

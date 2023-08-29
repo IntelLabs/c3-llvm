@@ -100,3 +100,5 @@ add_clang_library(clangCodeGen
   clangLex
   clangSerialization
   )
+
+include_directories(${LLVM_MAIN_INCLUDE_DIR}/../../c3/include)

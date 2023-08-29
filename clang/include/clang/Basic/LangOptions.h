@@ -138,6 +138,8 @@ public:
 
   enum AddrSpaceMapMangling { ASMM_Target, ASMM_On, ASMM_Off };
 
+  enum IntraObjectTripwire { IOTW_None, IOTW_All, IOTW_Attr };
+
   // Corresponds to _MSC_VER
   enum MSVCMajorVersion {
     MSVC2010 = 1600,

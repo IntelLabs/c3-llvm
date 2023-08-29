@@ -16,6 +16,7 @@
 #include "CGRecordLayout.h"
 #include "CodeGenFunction.h"
 #include "TargetInfo.h"
+#include "c3/malloc/cc_globals.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/CXXInheritance.h"
 #include "clang/AST/CharUnits.h"
@@ -26,6 +27,7 @@
 #include "clang/Basic/CodeGenOptions.h"
 #include "clang/Basic/TargetBuiltins.h"
 #include "clang/CodeGen/CGFunctionInfo.h"
+#include "llvm/IR/InlineAsm.h" // CC
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/Transforms/Utils/SanitizerStats.h"
@@ -784,6 +786,7 @@ void CodeGenFunction::EmitAsanPrologueOrEpilogue(bool Prologue) {
   struct SizeAndOffset {
     uint64_t Size;
     uint64_t Offset;
+    bool isArray;
   };
 
   unsigned PtrSize = CGM.getDataLayout().getPointerSizeInBits();
@@ -802,11 +805,15 @@ void CodeGenFunction::EmitAsanPrologueOrEpilogue(bool Prologue) {
     CharUnits FieldSize = FieldInfo.Width;
     assert(NumFields < SSV.size());
     SSV[NumFields].Size = D->isBitField() ? 0 : FieldSize.getQuantity();
+    SSV[NumFields].isArray =
+        D->getType().getTypePtr()->isArrayType() ? true : false;
     NumFields++;
   }
   assert(NumFields == SSV.size());
   if (SSV.size() <= 1) return;
 
+// CC: disable ASan runtime calls
+#if 0
   // We will insert calls to __asan_* run-time functions.
   // LLVM AddressSanitizer pass may decide to inline them later.
   llvm::Type *Args[2] = {IntPtrTy, IntPtrTy};
@@ -815,6 +822,7 @@ void CodeGenFunction::EmitAsanPrologueOrEpilogue(bool Prologue) {
   llvm::FunctionCallee F = CGM.CreateRuntimeFunction(
       FTy, Prologue ? "__asan_poison_intra_object_redzone"
                     : "__asan_unpoison_intra_object_redzone");
+#endif
 
   llvm::Value *ThisPtr = LoadCXXThis();
   ThisPtr = Builder.CreatePtrToInt(ThisPtr, IntPtrTy);
@@ -829,9 +837,65 @@ void CodeGenFunction::EmitAsanPrologueOrEpilogue(bool Prologue) {
     if (PoisonSize < AsanAlignment || !SSV[i].Size ||
         (NextField % AsanAlignment) != 0)
       continue;
+// CC: disable ASan runtime calls
+#if 0
     Builder.CreateCall(
         F, {Builder.CreateAdd(ThisPtr, Builder.getIntN(PtrSize, EndOffset)),
             Builder.getIntN(PtrSize, PoisonSize)});
+#endif
+    if (!SSV[i].isArray)
+      continue;
+
+    if (Prologue) {
+      // CC inter-obj tripwires
+      llvm::Value *EndOfObject = Builder.CreateAdd(
+          ThisPtr, Builder.getIntN(PtrSize, EndOffset)); // i64
+      llvm::Value *LeftTripwire = Builder.CreateSub(
+          EndOfObject, Builder.getIntN(PtrSize, SSV[i].Size + 8)); // i64
+      llvm::Value *RightTripwire = EndOfObject;                    // i64
+      // calculate offset (if any) to the tripwire 8-byte alignment
+      const uint64_t C3Alignment = 8;
+      uint64_t AlignmentDelta = PoisonSize % C3Alignment;
+      if (AlignmentDelta != 0) {
+        // unaligned tripwire start -> offset to alignment
+        RightTripwire = Builder.CreateAdd(
+            RightTripwire, Builder.getIntN(PtrSize, AlignmentDelta)); // i64
+      }
+
+      llvm::Value *TripwireAddrPtr = nullptr;
+      llvm::InlineAsm *IA;
+      llvm::Value *TripwirePoisonValue8B =
+          llvm::ConstantInt::get(Int64Ty, MAGIC_VAL_INTRA); // 8 bytes
+
+      // Set RIGHT Tripwire:
+      TripwireAddrPtr = Builder.CreateIntToPtr(RightTripwire, Int8PtrTy); // i8*
+      // set magic values inside the tripwire data field for future
+      // identification of tripwires
+      Builder.CreateStore(TripwirePoisonValue8B,
+                          Address(TripwireAddrPtr, TripwireAddrPtr->getType(),
+                                  CharUnits::fromQuantity(1)));
+      // invalidate the ICVs
+      IA = llvm::InlineAsm::get(llvm::FunctionType::get(VoidTy, {Int64Ty},
+                                                        false),
+                                StringRef(
+                                    ".byte 0xf0\n .byte 0x48\n .byte 0x2B\n "
+                                    ".byte 0xc0\n"), // cc_isa_invicv
+                                StringRef("{ax},~{dirflag},~{fpsr},~{flags}"),
+                                /*hasSideEffects=*/true,
+                                /*isAlignStack*/ false, llvm::InlineAsm::AD_ATT,
+                                /*canThrow*/ false);
+      Builder.CreateCall(IA, {RightTripwire});
+
+      // Set LEFT Tripwire:
+      TripwireAddrPtr = Builder.CreateIntToPtr(LeftTripwire, Int8PtrTy); // i8*
+      // set magic values inside the tripwire data field for future
+      // identification of tripwires
+      Builder.CreateStore(TripwirePoisonValue8B,
+                          Address(TripwireAddrPtr, TripwireAddrPtr->getType(),
+                                  CharUnits::fromQuantity(1)));
+      // invalidate the ICVs
+      Builder.CreateCall(IA, {LeftTripwire});
+    }
   }
 }
 
@@ -923,8 +987,21 @@ namespace {
 
     bool isMemcpyableField(FieldDecl *F) const {
       // Never memcpy fields when we are adding poisoned paddings.
+
+#if 0
+      // FCG: Memcpy now uses C3 Permissive variant,
+      // so memcpying with tripwires is allowed.
+      if (CGF.getContext().getLangOpts().getInsertIntraObjectTripwires() ==
+              LangOptions::IOTW_All ||
+          CGF.getContext().getLangOpts().getInsertIntraObjectTripwires() ==
+              LangOptions::IOTW_Attr) {
+        return false;
+      }
+#endif
+
       if (CGF.getContext().getLangOpts().SanitizeAddressFieldPadding)
         return false;
+
       Qualifiers Qual = F->getType().getQualifiers();
       if (Qual.hasVolatile() || Qual.hasObjCLifetime())
         return false;
@@ -1000,7 +1077,21 @@ namespace {
     void emitMemcpyIR(Address DestPtr, Address SrcPtr, CharUnits Size) {
       DestPtr = CGF.Builder.CreateElementBitCast(DestPtr, CGF.Int8Ty);
       SrcPtr = CGF.Builder.CreateElementBitCast(SrcPtr, CGF.Int8Ty);
+#if 1
+      // C3: use permissive memcpy here for constructor copies
+      llvm::Type *Args[3] = {CGF.Int8Ty, CGF.Int8Ty, CGF.Int64Ty};
+      llvm::FunctionType *FTy =
+          llvm::FunctionType::get(CGF.VoidPtrTy, Args, false);
+      // c3runtime.c:c3_memcpy_permissive
+      llvm::FunctionCallee F =
+          CGF.CGM.CreateRuntimeFunction(FTy, "c3_memcpy_permissive");
+      CGF.Builder.CreateCall(
+          FTy, F.getCallee(),
+          {DestPtr.getPointer(), SrcPtr.getPointer(),
+           llvm::ConstantInt::get(CGF.Int64Ty, Size.getQuantity())});
+#else
       CGF.Builder.CreateMemCpy(DestPtr, SrcPtr, Size.getQuantity());
+#endif
     }
 
     void addInitialField(FieldDecl *F) {

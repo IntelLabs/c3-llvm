@@ -1113,6 +1113,13 @@ collectSanitizerRuntimes(const ToolChain &TC, const ArgList &Args,
     NonWholeStaticRuntimes.push_back("safestack");
     RequiredSymbols.push_back("__safestack_init");
   }
+
+  // C3: piggyback on existing compiler-rt static runtime linking
+  if (Args.hasArg(options::OPT_finsert_intraobject_tripwires_EQ)) {
+    // this ensures the c3 runtime .a file is linked
+    StaticRuntimes.push_back("c3");
+  }
+
   if (!(SanArgs.needsSharedRt() && SanArgs.needsUbsanRt() && SanArgs.linkRuntimes())) {
     if (SanArgs.needsCfiRt() && SanArgs.linkRuntimes())
       StaticRuntimes.push_back("cfi");

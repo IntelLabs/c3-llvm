@@ -2081,6 +2081,82 @@ void ItaniumRecordLayoutBuilder::LayoutField(const FieldDecl *D,
     }
   }
 
+// Intra-Object Tripwire
+#define INTRAOBJECT_TRIPWIRE_SIZE 8
+  bool addTripwire;
+  CharUnits IntraObjectTripwire;
+  CharUnits IntraObjectAlignment =
+      CharUnits::fromQuantity(8); // Hardcoded alignment
+
+  // Determine when to add intra-object tripwires
+  //
+  // First look at the compiler options
+  switch (Context.getLangOpts().getInsertIntraObjectTripwires()) {
+  case LangOptions::IOTW_None:
+    // Never add tripwires
+    addTripwire = false;
+    break;
+  case LangOptions::IOTW_All:
+    // Always add tripwires
+    addTripwire = true;
+    break;
+  case LangOptions::IOTW_Attr:
+    // Only add tripwires when the member has the required attribute
+    addTripwire = false;
+    if (D->hasAttrs()) {
+      const AttrVec &Attrs = D->getAttrs();
+      for (auto *A : Attrs)
+        if (A->getKind() == attr::Tripwires)
+          addTripwire = true;
+    }
+    break;
+  default:
+    llvm_unreachable("unknown intra-object tripwire mode.");
+    break;
+  }
+  //
+  // Unions cannot have tripwires
+  if (IsUnion)
+    addTripwire = false;
+  //
+  // Not all struct member need tripwires, only array types
+  if (!D->getType()
+           .getTypePtr()
+           ->isArrayType()) // TODO: Are there other checks that match?
+    addTripwire = false;
+
+  // Store Tripwire Offsets for IR pass
+  const RecordDecl *RD = D->getParent();
+  uint64_t LeftTripwireOffset = 0;
+
+  // Intra-Object Tripwire BEFORE struct members
+  if (addTripwire) {
+    //
+    // Initialize tripwire size to the minimum
+    IntraObjectTripwire = CharUnits::fromQuantity(INTRAOBJECT_TRIPWIRE_SIZE);
+    //
+    // Align to an 8-byte boundary, then add the tripwire, this way the tripwire
+    // is always aligned.
+    if (FieldOffset % IntraObjectAlignment)
+      IntraObjectTripwire +=
+          IntraObjectAlignment -
+          CharUnits::fromQuantity(FieldOffset % IntraObjectAlignment);
+    //
+    // Move the FieldOffset pointer after the tripwire
+    FieldOffset += IntraObjectTripwire;
+
+    // Save Left Tripwire Offset
+    LeftTripwireOffset = Context.toBits(FieldOffset) / 8 - 8;
+  }
+
+  // Intra-object Tripwire Note:
+  //
+  //   Notice how the next statement records the current offset into some
+  //   internal LLVM structure that holds the offsetof's of the different
+  //   struct members. Since we previously added the tripwire size to
+  //   FieldOffset, offsetof() works as intended, i.e. it points after the
+  //   preceding tripwire.
+  //
   // Place this field at the current location.
   FieldOffsets.push_back(Context.toBits(FieldOffset));
 
@@ -2089,7 +2165,45 @@ void ItaniumRecordLayoutBuilder::LayoutField(const FieldDecl *D,
                       Context.toBits(UnpackedFieldOffset),
                       Context.toBits(UnpackedFieldAlign), FieldPacked, D);
 
-  if (InsertExtraPadding) {
+  // Intra-Object Tripwire AFTER struct members
+  if (addTripwire) {
+    //
+    // Initialize tripwire size to the minimum
+    IntraObjectTripwire = CharUnits::fromQuantity(INTRAOBJECT_TRIPWIRE_SIZE);
+    //
+    // Align to an 8-byte boundary, then add the tripwire, this way the tripwire
+    // is always aligned.
+    if (FieldSize % IntraObjectAlignment)
+      IntraObjectTripwire +=
+          IntraObjectAlignment -
+          CharUnits::fromQuantity(FieldSize % IntraObjectAlignment);
+    //
+    // Record the required storage for the original struct field and the
+    // tripwires.
+    EffectiveFieldSize = FieldSize = FieldSize + IntraObjectTripwire;
+
+    // Save Right Tripwire Offset
+    uint64_t RightTripwireOffset = Context.toBits(FieldOffset) / 8 +
+                                   Context.toBits(EffectiveFieldSize) / 8 - 8;
+
+    // Store offsets in temporary file
+    if (RD->getName().size() != 0) {
+      // TODO: this static filename can be problematic with multi-process builds
+      // also since the IR deletes the file to clean up this does not support
+      // multi-process builds
+      FILE *fp = fopen("/tmp/llvmtripwires", "a");
+      if (fp) {
+        fprintf(fp, "%s,%lu,%lu\n", RD->getName().data(), LeftTripwireOffset,
+                RightTripwireOffset);
+        fclose(fp);
+      }
+    }
+  }
+#undef INTRAOBJECT_TRIPWIRE_SIZE
+
+// disable conflicting ASan padding. 'InsertExtraPadding' now depends on C3 flag
+#if 0
+  if (InsertExtraPadding && !addTripwire) {
     CharUnits ASanAlignment = CharUnits::fromQuantity(8);
     CharUnits ExtraSizeForAsan = ASanAlignment;
     if (FieldSize % ASanAlignment)
@@ -2097,6 +2211,7 @@ void ItaniumRecordLayoutBuilder::LayoutField(const FieldDecl *D,
           ASanAlignment - CharUnits::fromQuantity(FieldSize % ASanAlignment);
     EffectiveFieldSize = FieldSize = FieldSize + ExtraSizeForAsan;
   }
+#endif
 
   // Reserve space for this field.
   if (!IsOverlappingEmptyField) {

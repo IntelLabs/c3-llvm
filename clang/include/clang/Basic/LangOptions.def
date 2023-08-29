@@ -399,6 +399,10 @@ LANGOPT(SanitizeAddressFieldPadding, 2, 0, "controls how aggressive is ASan "
                                            "field padding (0: none, 1:least "
                                            "aggressive, 2: more aggressive)")
 
+
+ENUM_LANGOPT(InsertIntraObjectTripwires, IntraObjectTripwire, 2, IOTW_None,
+             "controls when intra-object tripwires are added to array members of structs")
+
 LANGOPT(Cmse, 1, 0, "ARM Security extensions support")
 
 LANGOPT(XRayInstrument, 1, 0, "controls whether to do XRay instrumentation")

@@ -931,6 +931,13 @@ void CodeGenFunction::StartFunction(GlobalDecl GD, QualType RetTy,
       Fn->addFnAttr(llvm::Attribute::FnRetThunkExtern);
   }
 
+  if (FD &&
+      (getLangOpts().getInsertIntraObjectTripwires() == LangOptions::IOTW_All ||
+       getLangOpts().getInsertIntraObjectTripwires() ==
+           LangOptions::IOTW_Attr)) {
+    Fn->addFnAttr(llvm::Attribute::CCTripwires);
+  }
+
   if (FD && (getLangOpts().OpenCL ||
              (getLangOpts().HIP && getLangOpts().CUDAIsDevice))) {
     // Add metadata for a kernel function.

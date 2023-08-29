@@ -4829,11 +4829,21 @@ void RecordDecl::LoadFieldsFromExternalStorage() const {
 
 bool RecordDecl::mayInsertExtraPadding(bool EmitRemark) const {
   ASTContext &Context = getASTContext();
+
+  // CC: remove ASan dependency
+  if (Context.getLangOpts().getInsertIntraObjectTripwires() ==
+          LangOptions::IOTW_All ||
+      Context.getLangOpts().getInsertIntraObjectTripwires() ==
+          LangOptions::IOTW_Attr) {
+    return true;
+  }
+
   const SanitizerMask EnabledAsanMask = Context.getLangOpts().Sanitize.Mask &
       (SanitizerKind::Address | SanitizerKind::KernelAddress);
   if (!EnabledAsanMask || !Context.getLangOpts().SanitizeAddressFieldPadding)
     return false;
   const auto &NoSanitizeList = Context.getNoSanitizeList();
+
   const auto *CXXRD = dyn_cast<CXXRecordDecl>(this);
   // We may be able to relax some of these requirements.
   int ReasonToReject = -1;

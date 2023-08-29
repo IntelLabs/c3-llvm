@@ -1908,6 +1908,21 @@ def fsanitize_undefined_strip_path_components_EQ : Joined<["-"], "fsanitize-unde
 
 } // end -f[no-]sanitize* flags
 
+
+def finsert_intraobject_tripwires_EQ :
+  Joined<["-"], "finsert-intraobject-tripwires=">,
+  Group<f_Group>, Flags<[CC1Option]>,
+  Values<"none,all,attr">,
+  NormalizedValuesScope<"LangOptions">,
+  NormalizedValues<["IOTW_None", "IOTW_All", "IOTW_Attr"]>,
+  MarshallingInfoEnum<LangOpts<"InsertIntraObjectTripwires">, "IOTW_None">,
+  HelpText<"Enable intraobject tripwire insertion for specified struct members (options: none, all, attr)">;
+def finsert_intraobject_tripwires :
+  Flag<["-"], "finsert-intraobject-tripwires">,
+  Group<f_Group>, Flags<[CC1Option]>,
+  Alias<finsert_intraobject_tripwires_EQ>, AliasArgs<["attr"]>,
+  HelpText<"Insert tripwires around all array members of structs">;
+
 def funsafe_math_optimizations : Flag<["-"], "funsafe-math-optimizations">,
   Group<f_Group>, Flags<[CC1Option]>,
   HelpText<"Allow unsafe floating-point math optimizations which may decrease precision">,

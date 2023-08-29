@@ -81,7 +81,8 @@ add_llvm_component_library(LLVMTransformUtils
   Utils.cpp
   ValueMapper.cpp
   VNCoercion.cpp
-
+  Tripwires.cpp
+  
   ADDITIONAL_HEADER_DIRS
   ${LLVM_MAIN_INCLUDE_DIR}/llvm/Transforms
   ${LLVM_MAIN_INCLUDE_DIR}/llvm/Transforms/Utils
@@ -95,3 +96,5 @@ add_llvm_component_library(LLVMTransformUtils
   Support
   TargetParser
   )
+
+include_directories(${LLVM_MAIN_INCLUDE_DIR}/../../c3/include)

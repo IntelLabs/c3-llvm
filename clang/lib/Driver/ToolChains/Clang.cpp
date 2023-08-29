@@ -6221,6 +6221,11 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
 
   SanitizeArgs.addArgs(TC, Args, CmdArgs, InputType);
 
+  // Intra-Object Tripwire options
+  if (Arg *A = Args.getLastArg(options::OPT_finsert_intraobject_tripwires_EQ))
+    CmdArgs.push_back(Args.MakeArgString(
+        Twine("-finsert-intraobject-tripwires=") + A->getValue()));
+
   const XRayArgs &XRay = TC.getXRayArgs();
   XRay.addArgs(TC, Args, CmdArgs, InputType);
 

@@ -1102,6 +1102,12 @@ def Common : InheritableAttr {
   let Documentation = [Undocumented];
 }
 
+def Tripwires : InheritableAttr {
+  let Spellings = [GCC<"tripwires">];
+  let Documentation = [Undocumented];
+  let SimpleHandler = 1;
+}
+
 def Const : InheritableAttr {
   let Spellings = [GCC<"const">, GCC<"__const">];
   let Documentation = [Undocumented];
