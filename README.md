@@ -9,10 +9,10 @@ in https://github.com/IntelLabs/c3-simulator.
 
 This material is based upon work supported by the Naval Information Warfare
 Center Pacific and the Defense Advanced Research Project Agency under Prototype
-Other Transaction Agreement No. N66001-22-9-4017. Any opinions, findings and
+Other Transaction Agreement No. N66001-23-9-4004. Any opinions, findings and
 conclusions or recommendations expressed in this material are those of the
-author(s) and do not necessarily reflect the views of the Space and Naval
-Warfare Systems Center Pacific or the Defense Advanced Research Project Agency.
+author(s) and do not necessarily reflect the views of the Naval Information
+Warfare Center Pacific or the Defense Advanced Research Project Agency.
 
 # Original README:
 
