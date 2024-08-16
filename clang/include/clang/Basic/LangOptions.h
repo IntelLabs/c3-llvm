@@ -140,6 +140,8 @@ public:
 
   enum IntraObjectTripwire { IOTW_None, IOTW_All, IOTW_Attr };
 
+  enum OptimizeIntraObjectTripwire { OIOTW_Start, OIOTW_End, OIOTW_Edges, OIOTW_None };
+
   // Corresponds to _MSC_VER
   enum MSVCMajorVersion {
     MSVC2010 = 1600,

@@ -712,7 +712,8 @@ protected:
   void Layout(const ObjCInterfaceDecl *D);
 
   void LayoutFields(const RecordDecl *D);
-  void LayoutField(const FieldDecl *D, bool InsertExtraPadding);
+  void LayoutField(const FieldDecl *D, bool InsertExtraPadding,
+                   int64_t *LastTripwire, bool isLastField);
   void LayoutWideBitField(uint64_t FieldSize, uint64_t StorageUnitSize,
                           bool FieldPacked, const FieldDecl *D);
   void LayoutBitField(const FieldDecl *D);
@@ -1434,9 +1435,10 @@ void ItaniumRecordLayoutBuilder::Layout(const ObjCInterfaceDecl *D) {
 
   InitializeLayout(D);
   // Layout each ivar sequentially.
+  int64_t LastTripwire = -1;
   for (const ObjCIvarDecl *IVD = D->all_declared_ivar_begin(); IVD;
        IVD = IVD->getNextIvar())
-    LayoutField(IVD, false);
+    LayoutField(IVD, false, &LastTripwire, false);
 
   // Finally, round the size of the total struct up to the alignment of the
   // struct itself.
@@ -1448,11 +1450,18 @@ void ItaniumRecordLayoutBuilder::LayoutFields(const RecordDecl *D) {
   // the future, this will need to be tweakable by targets.
   bool InsertExtraPadding = D->mayInsertExtraPadding(/*EmitRemark=*/true);
   bool HasFlexibleArrayMember = D->hasFlexibleArrayMember();
+  int64_t LastTripwire = -1;
   for (auto I = D->field_begin(), End = D->field_end(); I != End; ++I) {
     auto Next(I);
     ++Next;
+    bool isLastField = false;
+    auto INext = I;
+    INext++;
+    if (INext == End)
+      isLastField = true;
     LayoutField(*I,
-                InsertExtraPadding && (Next != End || !HasFlexibleArrayMember));
+                InsertExtraPadding && (Next != End || !HasFlexibleArrayMember),
+                &LastTripwire, isLastField);
   }
 }
 
@@ -1851,7 +1860,9 @@ void ItaniumRecordLayoutBuilder::LayoutBitField(const FieldDecl *D) {
 }
 
 void ItaniumRecordLayoutBuilder::LayoutField(const FieldDecl *D,
-                                             bool InsertExtraPadding) {
+                                             bool InsertExtraPadding,
+                                             int64_t *LastTripwire,
+                                             bool isLastField) {
   auto *FieldClass = D->getType()->getAsCXXRecordDecl();
   bool PotentiallyOverlapping = D->hasAttr<NoUniqueAddressAttr>() && FieldClass;
   bool IsOverlappingEmptyField =
@@ -2099,9 +2110,16 @@ void ItaniumRecordLayoutBuilder::LayoutField(const FieldDecl *D,
   case LangOptions::IOTW_All:
     // Always add tripwires
     addTripwire = true;
+    // Except when the member is annotated with the notripwires attribute
+    if (D->hasAttrs()) {
+      const AttrVec &Attrs = D->getAttrs();
+      for (auto *A : Attrs)
+        if (A->getKind() == attr::NoTripwires)
+          addTripwire = false;
+    }
     break;
   case LangOptions::IOTW_Attr:
-    // Only add tripwires when the member has the required attribute
+    // Only add tripwires when the member has the tripwires attribute
     addTripwire = false;
     if (D->hasAttrs()) {
       const AttrVec &Attrs = D->getAttrs();
@@ -2125,28 +2143,65 @@ void ItaniumRecordLayoutBuilder::LayoutField(const FieldDecl *D,
            ->isArrayType()) // TODO: Are there other checks that match?
     addTripwire = false;
 
+  // Determine where to optimize tripwire insertion
+  bool skipTripwireAtStart;
+  bool skipTripwireAtEnd;
+  switch (Context.getLangOpts().getOptimizeIntraObjectTripwires()) {
+  case LangOptions::OIOTW_Start:
+    skipTripwireAtStart = true;
+    skipTripwireAtEnd = false;
+    break;
+  case LangOptions::OIOTW_End:
+    skipTripwireAtStart = false;
+    skipTripwireAtEnd = true;
+    break;
+  case LangOptions::OIOTW_Edges:
+    skipTripwireAtStart = true;
+    skipTripwireAtEnd = true;
+    break;
+  case LangOptions::OIOTW_None:
+    skipTripwireAtStart = false;
+    skipTripwireAtEnd = false;
+    break;
+  default:
+    llvm_unreachable("unknown intra-object tripwire optimization mode.");
+    break;
+  }
+
   // Store Tripwire Offsets for IR pass
   const RecordDecl *RD = D->getParent();
-  uint64_t LeftTripwireOffset = 0;
+  int64_t LeftTripwireOffset = 0;
 
   // Intra-Object Tripwire BEFORE struct members
+  int64_t CurrentOffset = FieldOffset.getQuantity();
+  int64_t CalculatedLastTripwire = CurrentOffset - INTRAOBJECT_TRIPWIRE_SIZE;
   if (addTripwire) {
-    //
-    // Initialize tripwire size to the minimum
-    IntraObjectTripwire = CharUnits::fromQuantity(INTRAOBJECT_TRIPWIRE_SIZE);
-    //
-    // Align to an 8-byte boundary, then add the tripwire, this way the tripwire
-    // is always aligned.
-    if (FieldOffset % IntraObjectAlignment)
-      IntraObjectTripwire +=
-          IntraObjectAlignment -
-          CharUnits::fromQuantity(FieldOffset % IntraObjectAlignment);
-    //
-    // Move the FieldOffset pointer after the tripwire
-    FieldOffset += IntraObjectTripwire;
+    // Skip tripwire at the beginning of the struct
+    if (CurrentOffset > 0 || !skipTripwireAtStart) {
+      // Do not place tripwires adjacent to each other
+      if (CalculatedLastTripwire != *LastTripwire) {
+        //
+        // Initialize tripwire size to the minimum
+        IntraObjectTripwire = CharUnits::fromQuantity(INTRAOBJECT_TRIPWIRE_SIZE);
+        //
+        // Align to an 8-byte boundary, then add the tripwire, this way the tripwire
+        // is always aligned.
+        if (FieldOffset % IntraObjectAlignment)
+          IntraObjectTripwire +=
+              IntraObjectAlignment -
+              CharUnits::fromQuantity(FieldOffset % IntraObjectAlignment);
+        //
+        // Move the FieldOffset pointer after the tripwire
+        FieldOffset += IntraObjectTripwire;
 
-    // Save Left Tripwire Offset
-    LeftTripwireOffset = Context.toBits(FieldOffset) / 8 - 8;
+        // Save Left Tripwire Offset
+        LeftTripwireOffset = Context.toBits(FieldOffset) / 8 - 8;
+      }
+      else
+        LeftTripwireOffset = CalculatedLastTripwire;
+    }
+    else
+      LeftTripwireOffset = -1;
   }
 
   // Intra-object Tripwire Note:
@@ -2168,23 +2223,34 @@ void ItaniumRecordLayoutBuilder::LayoutField(const FieldDecl *D,
   // Intra-Object Tripwire AFTER struct members
   if (addTripwire) {
     //
-    // Initialize tripwire size to the minimum
-    IntraObjectTripwire = CharUnits::fromQuantity(INTRAOBJECT_TRIPWIRE_SIZE);
-    //
-    // Align to an 8-byte boundary, then add the tripwire, this way the tripwire
-    // is always aligned.
-    if (FieldSize % IntraObjectAlignment)
-      IntraObjectTripwire +=
-          IntraObjectAlignment -
-          CharUnits::fromQuantity(FieldSize % IntraObjectAlignment);
-    //
-    // Record the required storage for the original struct field and the
-    // tripwires.
-    EffectiveFieldSize = FieldSize = FieldSize + IntraObjectTripwire;
+    // Skip tripwire at the end of the struct
+    int64_t RightTripwireOffset;
+    if (isLastField && skipTripwireAtEnd) {
+      RightTripwireOffset = -1;
+    }
+    else {
+      //
+      // Initialize tripwire size to the minimum
+      IntraObjectTripwire = CharUnits::fromQuantity(INTRAOBJECT_TRIPWIRE_SIZE);
+      //
+      // Align to an 8-byte boundary, then add the tripwire, this way the tripwire
+      // is always aligned.
+      if (FieldSize % IntraObjectAlignment)
+        IntraObjectTripwire +=
+            IntraObjectAlignment -
+            CharUnits::fromQuantity(FieldSize % IntraObjectAlignment);
+      //
+      // Record the required storage for the original struct field and the
+      // tripwires.
+      EffectiveFieldSize = FieldSize = FieldSize + IntraObjectTripwire;
 
-    // Save Right Tripwire Offset
-    uint64_t RightTripwireOffset = Context.toBits(FieldOffset) / 8 +
-                                   Context.toBits(EffectiveFieldSize) / 8 - 8;
+      // Save Right Tripwire Offset
+      RightTripwireOffset = Context.toBits(FieldOffset) / 8 +
+                            Context.toBits(EffectiveFieldSize) / 8 - 8;
+    }
+
+    // Save information about the last tripwire
+    *LastTripwire = RightTripwireOffset;
 
     // Store offsets in temporary file
     if (RD->getName().size() != 0) {
@@ -2193,7 +2259,7 @@ void ItaniumRecordLayoutBuilder::LayoutField(const FieldDecl *D,
       // multi-process builds
       FILE *fp = fopen("/tmp/llvmtripwires", "a");
       if (fp) {
-        fprintf(fp, "%s,%lu,%lu\n", RD->getName().data(), LeftTripwireOffset,
+        fprintf(fp, "%s,%ld,%ld\n", RD->getName().data(), LeftTripwireOffset,
                 RightTripwireOffset);
         fclose(fp);
       }

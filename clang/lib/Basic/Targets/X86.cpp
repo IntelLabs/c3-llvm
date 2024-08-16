@@ -357,6 +357,8 @@ bool X86TargetInfo::handleTargetFeatures(std::vector<std::string> &Features,
       HasCRC32 = true;
     } else if (Feature == "+x87") {
       HasX87 = true;
+    } else if (Feature == "+preiniticv") {
+      HasPREINITICV = true;
     }
 
     X86SSEEnum Level = llvm::StringSwitch<X86SSEEnum>(Feature)
@@ -822,6 +824,8 @@ void X86TargetInfo::getTargetDefines(const LangOptions &Opts,
     Builder.defineMacro("__UINTR__");
   if (HasCRC32)
     Builder.defineMacro("__CRC32__");
+  if (HasPREINITICV)
+    Builder.defineMacro("__PREINITICV__");
 
   // Each case falls through to the previous one here.
   switch (SSELevel) {
@@ -974,6 +978,7 @@ bool X86TargetInfo::isValidFeatureName(StringRef Name) const {
       .Case("popcnt", true)
       .Case("prefetchi", true)
       .Case("prefetchwt1", true)
+      .Case("preiniticv", true)
       .Case("prfchw", true)
       .Case("ptwrite", true)
       .Case("raoint", true)
@@ -1077,6 +1082,7 @@ bool X86TargetInfo::hasFeature(StringRef Feature) const {
       .Case("popcnt", HasPOPCNT)
       .Case("prefetchi", HasPREFETCHI)
       .Case("prefetchwt1", HasPREFETCHWT1)
+      .Case("preiniticv", HasPREINITICV)
       .Case("prfchw", HasPRFCHW)
       .Case("ptwrite", HasPTWRITE)
       .Case("raoint", HasRAOINT)

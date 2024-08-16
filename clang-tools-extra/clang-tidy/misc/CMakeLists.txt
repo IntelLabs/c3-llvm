@@ -16,6 +16,7 @@ add_custom_command(
 add_custom_target(genconfusable DEPENDS Confusables.inc)
 
 add_clang_library(clangTidyMiscModule
+  C3StructBufTripwiresCheck.cpp
   ConstCorrectnessCheck.cpp
   DefinitionsInHeadersCheck.cpp
   ConfusableIdentifierCheck.cpp

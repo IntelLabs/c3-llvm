@@ -59,6 +59,7 @@ add_llvm_component_library(LLVMTransformUtils
   ModuleUtils.cpp
   NameAnonGlobals.cpp
   PredicateInfo.cpp
+  PreInitICV.cpp
   PromoteMemoryToRegister.cpp
   RelLookupTableConverter.cpp
   ScalarEvolutionExpander.cpp

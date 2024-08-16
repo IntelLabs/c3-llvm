@@ -1923,6 +1923,20 @@ def finsert_intraobject_tripwires :
   Alias<finsert_intraobject_tripwires_EQ>, AliasArgs<["attr"]>,
   HelpText<"Insert tripwires around all array members of structs">;
 
+def foptimize_intraobject_tripwires_EQ :
+  Joined<["-"], "foptimize-intraobject-tripwires=">,
+  Group<f_Group>, Flags<[CC1Option]>,
+  Values<"start,end,edges,none">,
+  NormalizedValuesScope<"LangOptions">,
+  NormalizedValues<["OIOTW_Start", "OIOTW_End", "OIOTW_Edges", "OIOTW_None"]>,
+  MarshallingInfoEnum<LangOpts<"OptimizeIntraObjectTripwires">, "OIOTW_None">,
+  HelpText<"Avoids intraobject tripwire insertion at edges of structs (options: start, end, edges, none)">;
+def foptimize_intraobject_tripwires :
+  Flag<["-"], "foptimize-intraobject-tripwires">,
+  Group<f_Group>, Flags<[CC1Option]>,
+  Alias<foptimize_intraobject_tripwires_EQ>, AliasArgs<["edges"]>,
+  HelpText<"Avoids intraobject tripwires at both edges of structs">;
+
 def funsafe_math_optimizations : Flag<["-"], "funsafe-math-optimizations">,
   Group<f_Group>, Flags<[CC1Option]>,
   HelpText<"Allow unsafe floating-point math optimizations which may decrease precision">,
@@ -4813,6 +4827,15 @@ def mretpoline_external_thunk : Flag<["-"], "mretpoline-external-thunk">, Group<
 def mno_retpoline_external_thunk : Flag<["-"], "mno-retpoline-external-thunk">, Group<m_x86_Features_Group>;
 def mvzeroupper : Flag<["-"], "mvzeroupper">, Group<m_x86_Features_Group>;
 def mno_vzeroupper : Flag<["-"], "mno-vzeroupper">, Group<m_x86_Features_Group>;
+
+def mpreiniticv :
+  Flag<["-"], "mpreiniticv">,
+  Group<m_x86_Features_Group>, Flags<[CC1Option]>,
+  MarshallingInfoFlag<CodeGenOpts<"PreInitICV">>,
+  HelpText<"Emit ICV pre-initialization loop after heap allocations">;
+def mno_preiniticv : Flag<["-"], "mno-preiniticv">,
+  Group<m_x86_Features_Group>, Flags<[CC1Option]>,
+  HelpText<"Disable Emission of ICV pre-initialization loop after heap allocations">;
 
 // These are legacy user-facing driver-level option spellings. They are always
 // aliases for options that are spelled using the more common Unix / GNU flag

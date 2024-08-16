@@ -243,6 +243,7 @@ Clang-Tidy Checks
    `llvmlibc-callee-namespace <llvmlibc/callee-namespace.html>`_,
    `llvmlibc-implementation-in-namespace <llvmlibc/implementation-in-namespace.html>`_,
    `llvmlibc-restrict-system-libc-headers <llvmlibc/restrict-system-libc-headers.html>`_, "Yes"
+   `misc-c3-struct-buf-tripwires <misc/c3-struct-buf-tripwires.html>`_, "Yes"
    `misc-confusable-identifiers <misc/confusable-identifiers.html>`_,
    `misc-const-correctness <misc/const-correctness.html>`_, "Yes"
    `misc-definitions-in-headers <misc/definitions-in-headers.html>`_, "Yes"

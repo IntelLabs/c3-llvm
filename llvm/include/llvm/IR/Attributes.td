@@ -309,6 +309,9 @@ def PresplitCoroutine : EnumAttr<"presplitcoroutine", [FnAttr]>;
 /// CC Tripwires Function Attribute
 def CCTripwires : EnumAttr<"cctripwires", [FnAttr]>;
 
+/// CC PreInitICV Function Attribute
+def CCPreInitICV : EnumAttr<"ccpreiniticv", [FnAttr]>;
+
 
 /// Target-independent string attributes.
 def LessPreciseFPMAD : StrBoolAttr<"less-precise-fpmad">;

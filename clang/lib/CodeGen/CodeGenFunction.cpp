@@ -938,6 +938,9 @@ void CodeGenFunction::StartFunction(GlobalDecl GD, QualType RetTy,
     Fn->addFnAttr(llvm::Attribute::CCTripwires);
   }
 
+  if (FD && CGM.getCodeGenOpts().PreInitICV)
+    Fn->addFnAttr(llvm::Attribute::CCPreInitICV);
+
   if (FD && (getLangOpts().OpenCL ||
              (getLangOpts().HIP && getLangOpts().CUDAIsDevice))) {
     // Add metadata for a kernel function.

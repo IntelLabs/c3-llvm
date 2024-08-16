@@ -504,6 +504,9 @@ CODEGENOPT(OpaquePointers, 1, 0)
 /// non-deleting destructors. (No effect on Microsoft ABI.)
 CODEGENOPT(CtorDtorReturnThis, 1, 0)
 
+/// Controls whether to emit preInitICV instructions after heap allocations
+CODEGENOPT(PreInitICV, 1, 0)
+
 #undef CODEGENOPT
 #undef ENUM_CODEGENOPT
 #undef VALUE_CODEGENOPT

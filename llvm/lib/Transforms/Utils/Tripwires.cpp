@@ -118,7 +118,14 @@ void replaceMemFamilyCalls(Function &F) {
   }
 }
 
-void invalidateTripwire(CallInst *CallSrc, uint64_t Offset) {
+void invalidateTripwire(CallInst *CallSrc, int64_t Offset) {
+  // Skip tripwire at the beginning of the struct
+  if (Offset < 0) {
+#if DEBUG_PRINTS == 1
+    errs() << "Skipping tripwire at edge of struct\n";
+#endif
+    return;
+  }
   const DataLayout &DL = CallSrc->getModule()->getDataLayout();
   // insert invalidate-icv _after_ the allocation call
   IRBuilder<> Builder(CallSrc->getNextNode());
@@ -151,7 +158,8 @@ void invalidateTripwire(CallInst *CallSrc, uint64_t Offset) {
 }
 
 bool arrayHasTripwires(StructType *s, uint64_t ElementOffset,
-                       uint64_t DistanceToRightTripwire) {
+                       uint64_t DistanceToRightTripwire,
+                       int64_t *recordLeft, int64_t *recordRight) {
   // DistanceToRightTripwire: this can be unequal to sizeof(element) because the
   // tripwire needs to align at 8
   // TODO: cache the file data to avoid reading it multiple times
@@ -163,8 +171,11 @@ bool arrayHasTripwires(StructType *s, uint64_t ElementOffset,
     while ((read = getline(&line, &len, fp)) != -1) {
 
       char *StructName = strtok(line, ",");
-      uint64_t LeftTripwireOffset = strtoull(strtok(NULL, ","), NULL, 10);
-      uint64_t RightTripwireOffset = strtoull(strtok(NULL, ","), NULL, 10);
+      int64_t LeftTripwireOffset = strtoull(strtok(NULL, ","), NULL, 10);
+      int64_t RightTripwireOffset = strtoull(strtok(NULL, ","), NULL, 10);
+
+      *recordLeft = -1;
+      *recordRight = -1;
 
       const char *IRStructName = s->getName().data();
       // TODO: improve heuristics?
@@ -175,13 +186,18 @@ bool arrayHasTripwires(StructType *s, uint64_t ElementOffset,
 
         // now evaluate whether the struct names are equal
         if (strncmp(IRStrippedName, StructName, strlen(IRStrippedName)) == 0) {
-          if (LeftTripwireOffset == ElementOffset - 8 &&
-              RightTripwireOffset == ElementOffset + DistanceToRightTripwire) {
+          if ((LeftTripwireOffset == -1
+               || LeftTripwireOffset == (int64_t)ElementOffset - 8)
+              &&
+              (RightTripwireOffset == -1
+               || RightTripwireOffset == (int64_t)ElementOffset + (int64_t)DistanceToRightTripwire)) {
 #if DEBUG_PRINTS == 1
             errs() << "> STRUCT MATCH: " << s->getName() << " " << StructName
                    << " " << LeftTripwireOffset << " " << RightTripwireOffset
                    << "\n";
 #endif
+            *recordLeft = LeftTripwireOffset;
+            *recordRight = RightTripwireOffset;
             return true;
           }
         }
@@ -223,6 +239,7 @@ bool evaluateForStructUses(CallInst *CallSrc, Instruction *Target,
 #endif
 
           unsigned NumElements = TypeTarget->getNumElements();
+          int64_t lastInvalidate = -1;
           for (unsigned i = 0; i < NumElements; i++) {
             Type *ElementTy = TypeTarget->getElementType(i);
 #if DEBUG_PRINTS == 1
@@ -242,24 +259,38 @@ bool evaluateForStructUses(CallInst *CallSrc, Instruction *Target,
             // anyway
             if (i + 1 < NumElements) {
               uint64_t NextOffset = SL->getElementOffset(i + 1);
-              uint64_t LeftTripwire = ElementOffset - 8;
-              uint64_t RightTripwire = NextOffset;
+              int64_t LeftTripwire = ElementOffset - 8;
+              int64_t RightTripwire = NextOffset;
 
               if (RightTripwire % 8) {
                 // Align the right tripwire to multiple of 8
                 RightTripwire += 8 - (RightTripwire % 8);
               }
 
+              int64_t recordLeft = -1;
+              int64_t recordRight = -1;
+
               if (ElementTy->isArrayTy() &&
                   arrayHasTripwires(TypeTarget, ElementOffset,
-                                    RightTripwire - ElementOffset)) {
+                                    RightTripwire - ElementOffset,
+                                    &recordLeft, &recordRight)) {
+                // Skip tripwires if the front-end did not create them
+                if (recordLeft == -1)
+                  LeftTripwire = -1;
+                if (recordRight == -1)
+                  RightTripwire = -1;
 #if DEBUG_PRINTS == 1
                 errs() << "> Array Size " << NextOffset - ElementOffset
                        << " Set Tripwires At: " << LeftTripwire << " and "
                        << RightTripwire << "\n";
 #endif
-                invalidateTripwire(CallSrc, LeftTripwire);
+                // Emit the tripwire invalidation instructions, but do not emit
+                // it a second time for adjacent arrays, since they share the
+                // tripwire in between them.
+                if (lastInvalidate != LeftTripwire)
+                  invalidateTripwire(CallSrc, LeftTripwire);
                 invalidateTripwire(CallSrc, RightTripwire);
+                lastInvalidate = RightTripwire;
                 handled = true;
               }
             }

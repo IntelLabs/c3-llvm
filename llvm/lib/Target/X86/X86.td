@@ -659,6 +659,14 @@ def TuningUseGLMDivSqrtCosts
         "Use Goldmont specific floating point div/sqrt costs">;
 
 //===----------------------------------------------------------------------===//
+// X86 Subtarget C3 Features
+//===----------------------------------------------------------------------===//
+
+def FeaturePREINITICV
+    : SubtargetFeature<"preiniticv", "HasPREINITICV", "true",
+        "Support C3 PreInitICV instructions">;
+
+//===----------------------------------------------------------------------===//
 // X86 CPU Families
 // TODO: Remove these - use general tuning features to determine codegen.
 //===----------------------------------------------------------------------===//

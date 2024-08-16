@@ -807,6 +807,10 @@ static uint64_t getAttrKindEncoding(Attribute::AttrKind Kind) {
     return bitc::ATTR_KIND_MUSTPROGRESS;
   case Attribute::PresplitCoroutine:
     return bitc::ATTR_KIND_PRESPLIT_COROUTINE;
+  case Attribute::CCTripwires:
+    return bitc::ATTR_KIND_CCTRIPWIRES;
+  case Attribute::CCPreInitICV:
+    return bitc::ATTR_KIND_CCPREINITICV;
   case Attribute::EndAttrKinds:
     llvm_unreachable("Can not encode end-attribute kinds marker.");
   case Attribute::None:

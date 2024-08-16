@@ -115,6 +115,16 @@ New checks
   Finds usages of ``realloc`` where the return value is assigned to the
   same expression as passed to the first argument.
 
+- New :doc:`c3-struct-buf-tripwires
+  <clang-tidy/checks/c3/struct-buf-tripwires>` check.
+
+  FIXME: add release notes.
+
+- New :doc:`c3-struct-buf-tripwires
+  <clang-tidy/checks/c3/struct-buf-tripwires>` check.
+
+  FIXME: add release notes.
+
 - New :doc:`cppcoreguidelines-avoid-const-or-ref-data-members
   <clang-tidy/checks/cppcoreguidelines/avoid-const-or-ref-data-members>` check.
 
@@ -129,6 +139,11 @@ New checks
   <clang-tidy/checks/cppcoreguidelines/avoid-reference-coroutine-parameters>` check.
 
   Warns on coroutines that accept reference parameters.
+
+- New :doc:`misc-c3-struct-buf-tripwires
+  <clang-tidy/checks/misc/c3-struct-buf-tripwires>` check.
+
+  FIXME: add release notes.
 
 - New :doc:`misc-use-anonymous-namespace
   <clang-tidy/checks/misc/use-anonymous-namespace>` check.

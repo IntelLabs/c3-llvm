@@ -90,6 +90,7 @@
 #include "llvm/Transforms/Utils/EntryExitInstrumenter.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
 #include "llvm/Transforms/Utils/NameAnonGlobals.h"
+#include "llvm/Transforms/Utils/PreInitICV.h"
 #include "llvm/Transforms/Utils/SymbolRewriter.h"
 #include "llvm/Transforms/Utils/Tripwires.h"
 #include <memory>
@@ -901,6 +902,7 @@ void EmitAssemblyHelper::RunOptimizationPipeline(
   PB.registerOptimizerLastEPCallback(
       [](ModulePassManager &MPM, OptimizationLevel Level) {
         MPM.addPass(TripwiresPass());
+        MPM.addPass(PreInitICVPass());
       });
 
   if (!CodeGenOpts.DisableLLVMPasses) {

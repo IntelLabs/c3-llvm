@@ -1108,6 +1108,12 @@ def Tripwires : InheritableAttr {
   let SimpleHandler = 1;
 }
 
+def NoTripwires : InheritableAttr {
+  let Spellings = [GCC<"notripwires">];
+  let Documentation = [Undocumented];
+  let SimpleHandler = 1;
+}
+
 def Const : InheritableAttr {
   let Spellings = [GCC<"const">, GCC<"__const">];
   let Documentation = [Undocumented];
