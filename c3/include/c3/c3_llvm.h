@@ -19,8 +19,8 @@
 #define dbgprint(f, ...)
 #endif
 
-static constexpr size_t c3_ptr_key_size = KEY_SIZE(CC_POINTER_CIPHER);
-static constexpr size_t c3_data_key_size = KEY_SIZE(CC_DATA_CIPHER);
+static constexpr size_t c3_ptr_key_size = C3_KEY_SIZE(CC_POINTER_CIPHER);
+static constexpr size_t c3_data_key_size = C3_KEY_SIZE(CC_DATA_CIPHER);
 
 static inline std::string buf_to_hex_string(const uint8_t *buf, size_t len) {
     std::stringstream ss;

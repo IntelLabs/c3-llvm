@@ -57,8 +57,8 @@ void ProcessElfCore::Terminate() {
 #undef BITMASK
 
 void ProcessElfCore::c3_init() {
-  static constexpr size_t c3_ptr_key_size = KEY_SIZE(CC_POINTER_CIPHER);
-  static constexpr size_t c3_data_key_size = KEY_SIZE(CC_DATA_CIPHER);
+  static constexpr size_t c3_ptr_key_size = C3_KEY_SIZE(CC_POINTER_CIPHER);
+  static constexpr size_t c3_data_key_size = C3_KEY_SIZE(CC_DATA_CIPHER);
   static constexpr uint8_t def_ptr_key[c3_ptr_key_size] = {
       0xd1, 0xbe, 0x2c, 0xdb, 0xb5, 0x82, 0x4d, 0x03, 0x17, 0x5c, 0x25,
       0x2a, 0x20, 0xb6, 0xf2, 0x93, 0xfd, 0x01, 0x96, 0xe7, 0xb5, 0xe6,
