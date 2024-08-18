@@ -396,27 +396,6 @@ ProcessSP Process::FindPlugin(lldb::TargetSP target_sp,
   return process_sp;
 }
 
-#define C3_DEBUGGING_SUPPORT
-#ifdef C3_DEBUGGING_SUPPORT
-static inline void c3_not_supported() { fprintf(stderr, "not a C3 process\n"); }
-void Process::c3_init() { c3_not_supported(); }
-void Process::c3_dump_keys() { c3_not_supported(); }
-const uint8_t *Process::c3_get_data_key() const {
-  c3_not_supported();
-  return nullptr;
-}
-const uint8_t *Process::c3_get_ptr_key() const {
-  c3_not_supported();
-  return nullptr;
-}
-void Process::c3_set_data_key(const uint8_t *) { c3_not_supported(); }
-void Process::c3_set_ptr_key(const uint8_t *) { c3_not_supported(); }
-uint64_t Process::c3_decode_ptr(uint64_t ptr) {
-  c3_not_supported();
-  return ptr;
-}
-#endif // C3_DEBUGGING_SUPPORT
-
 ConstString &Process::GetStaticBroadcasterClass() {
   static ConstString class_name("lldb.process");
   return class_name;

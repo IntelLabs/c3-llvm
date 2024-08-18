@@ -14,6 +14,8 @@
 #include "lldb/Utility/LLDBLog.h"
 #include "lldb/Utility/Log.h"
 
+#include "llvm/BinaryFormat/ELF.h"
+
 #include "Plugins/Process/Utility/RegisterContextFreeBSD_i386.h"
 #include "Plugins/Process/Utility/RegisterContextFreeBSD_mips64.h"
 #include "Plugins/Process/Utility/RegisterContextFreeBSD_powerpc.h"
@@ -46,7 +48,18 @@ using namespace lldb_private;
 // Construct a Thread object with given data
 ThreadElfCore::ThreadElfCore(Process &process, const ThreadData &td)
     : Thread(process, td.tid), m_thread_name(td.name), m_thread_reg_ctx_sp(),
-      m_signo(td.signo), m_gpregset_data(td.gpregset), m_notes(td.notes) {}
+      m_signo(td.signo), m_gpregset_data(td.gpregset), m_notes(td.notes) {
+#ifdef C3_DEBUGGING_SUPPORT
+  for (auto &note : td.notes) {
+    if (note.info.n_type == llvm::ELF::NT_C3_CTX) {
+      assert(c3 == nullptr);
+      c3 = std::make_shared<c3_lldb::C3Support>(this);
+      c3->ReadElfCoreNote(&note.data);
+      break;
+    }
+  }
+#endif // C3_DEBUGGING_SUPPORT
+}
 
 ThreadElfCore::~ThreadElfCore() { DestroyThread(); }
 

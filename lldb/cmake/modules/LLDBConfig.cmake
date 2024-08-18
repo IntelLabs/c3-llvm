@@ -347,3 +347,5 @@ if ((CMAKE_SYSTEM_NAME MATCHES "Android") AND LLVM_BUILD_STATIC AND
 endif()
 
 include(LLDBGenerateConfig)
+
+include_directories("${CMAKE_SOURCE_DIR}/../c3/include")

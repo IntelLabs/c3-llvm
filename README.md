@@ -5,7 +5,8 @@ purposes and may contain software with vulnerabilities, such as outdated
 libraries. Do not use in production.
 
 This library is solely intended for use in the context of the system contained
-in https://github.com/IntelLabs/c3-simulator.
+in https://github.com/IntelLabs/c3-simulator or versions of that system
+available from other sources, e.g., delivered as ZIP files.
 
 This material is based upon work supported by the Naval Information Warfare
 Center Pacific and the Defense Advanced Research Project Agency under Prototype

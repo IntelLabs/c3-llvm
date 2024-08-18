@@ -10,6 +10,7 @@
 #define LLDB_SOURCE_PLUGINS_PROCESS_ELF_CORE_THREADELFCORE_H
 
 #include "Plugins/Process/elf-core/RegisterUtilities.h"
+#include "lldb/Target/C3Support.h"
 #include "lldb/Target/Thread.h"
 #include "lldb/Utility/DataExtractor.h"
 #include "llvm/ADT/DenseMap.h"
@@ -160,6 +161,10 @@ public:
       m_thread_name.clear();
   }
 
+#ifdef C3_DEBUGGING_SUPPORT
+  std::shared_ptr<c3_lldb::C3Support> c3_get() override { return c3; }
+#endif // C3_DEBUGGING_SUPPORT
+
 protected:
   // Member variables.
   std::string m_thread_name;
@@ -171,6 +176,11 @@ protected:
   std::vector<lldb_private::CoreNote> m_notes;
 
   bool CalculateStopInfo() override;
+
+private:
+#ifdef C3_DEBUGGING_SUPPORT
+  std::shared_ptr<c3_lldb::C3Support> c3 = nullptr;
+#endif // C3_DEBUGGING_SUPPORT
 };
 
 #endif // LLDB_SOURCE_PLUGINS_PROCESS_ELF_CORE_THREADELFCORE_H

@@ -533,7 +533,6 @@ void CommandInterpreter::LoadCommandDictionary() {
   REGISTER_COMMAND_OBJECT("apropos", CommandObjectApropos);
   REGISTER_COMMAND_OBJECT("breakpoint", CommandObjectMultiwordBreakpoint);
   REGISTER_COMMAND_OBJECT("command", CommandObjectMultiwordCommands);
-#define C3_DEBUGGING_SUPPORT
 #ifdef C3_DEBUGGING_SUPPORT
   REGISTER_COMMAND_OBJECT("c3", CommandObjectC3);
 #endif  // C3_DEBUGGING_SUPPORT

@@ -63,6 +63,7 @@ static constexpr Log::Category g_categories[] = {
     {{"on-demand"},
      {"log symbol on-demand related activities"},
      LLDBLog::OnDemand},
+    {{"c3"}, {"log C3 operations"}, LLDBLog::C3},
 };
 
 static Log::Channel g_log_channel(g_categories,

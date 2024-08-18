@@ -14,7 +14,9 @@
 #include <string>
 #include <vector>
 
+#include "c3/c3_llvm.h"
 #include "lldb/Core/UserSettingsController.h"
+#include "lldb/Target/C3Support.h"
 #include "lldb/Target/ExecutionContextScope.h"
 #include "lldb/Target/RegisterCheckpoint.h"
 #include "lldb/Target/StackFrameList.h"
@@ -1198,6 +1200,10 @@ public:
   lldb::ThreadSP GetCurrentExceptionBacktrace();
 
   lldb::ValueObjectSP GetSiginfoValue();
+
+#ifdef C3_DEBUGGING_SUPPORT
+  virtual std::shared_ptr<c3_lldb::C3Support> c3_get() { return nullptr; }
+#endif // C3_DEBUGGING_SUPPORT
 
 protected:
   friend class ThreadPlan;
